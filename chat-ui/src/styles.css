@@ -1,0 +1,242 @@
+:root {
+  font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+  color: #1d1d1f;
+  background:
+    radial-gradient(circle at top left, rgba(255, 214, 153, 0.55), transparent 28%),
+    linear-gradient(180deg, #fff8ef 0%, #f7efe2 100%);
+  line-height: 1.5;
+  font-weight: 400;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --surface: rgba(255, 252, 246, 0.88);
+  --surface-strong: #fffdf8;
+  --border: rgba(122, 73, 33, 0.12);
+  --accent: #b95722;
+  --accent-strong: #8e4219;
+  --ink-soft: #6b625b;
+  --shadow: 0 24px 60px rgba(103, 64, 31, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.recipe-app {
+  min-height: 100vh;
+  padding: 32px 20px;
+}
+
+.recipe-shell {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 22px;
+}
+
+.recipe-hero,
+.chat-panel {
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+}
+
+.recipe-hero {
+  padding: 28px;
+}
+
+.recipe-kicker,
+.chat-label,
+.message-role,
+.composer-hint,
+.chat-status {
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+}
+
+.recipe-kicker,
+.chat-label {
+  margin: 0;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.recipe-hero h1,
+.chat-header h2 {
+  margin: 10px 0 0;
+  font-family: "Space Grotesk", "Noto Sans SC", sans-serif;
+  letter-spacing: -0.04em;
+}
+
+.recipe-hero h1 {
+  font-size: clamp(2.1rem, 6vw, 4rem);
+  line-height: 0.96;
+}
+
+.recipe-copy {
+  margin: 16px 0 0;
+  max-width: 700px;
+  color: var(--ink-soft);
+  font-size: 1rem;
+}
+
+.recipe-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.prompt-button,
+.composer button {
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.prompt-button {
+  padding: 10px 14px;
+  color: var(--accent-strong);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(185, 87, 34, 0.12);
+}
+
+.chat-panel {
+  padding: 22px;
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.chat-header h2 {
+  font-size: 1.5rem;
+}
+
+.chat-status {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--border);
+}
+
+.message-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.message-card {
+  max-width: 100%;
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(29, 29, 31, 0.08);
+  background: var(--surface-strong);
+}
+
+.message-card.user {
+  background: linear-gradient(135deg, rgba(185, 87, 34, 0.1), rgba(185, 87, 34, 0.18));
+}
+
+.message-role {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.message-card pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+}
+
+.composer {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.composer textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 14px 16px;
+  resize: vertical;
+  border: 1px solid rgba(29, 29, 31, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.8);
+  outline: none;
+}
+
+.composer textarea:focus {
+  border-color: rgba(185, 87, 34, 0.45);
+  box-shadow: 0 0 0 4px rgba(185, 87, 34, 0.08);
+}
+
+.composer-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+}
+
+.composer button {
+  padding: 12px 20px;
+  color: #fff8f3;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  box-shadow: 0 12px 24px rgba(185, 87, 34, 0.22);
+}
+
+.prompt-button:hover,
+.composer button:hover {
+  transform: translateY(-1px);
+}
+
+.composer button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.error-text {
+  margin: 14px 0 0;
+  color: #b42318;
+  font-size: 0.92rem;
+}
+
+@media (max-width: 720px) {
+  .recipe-app {
+    padding: 16px;
+  }
+
+  .recipe-hero,
+  .chat-panel {
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  .chat-header,
+  .composer-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

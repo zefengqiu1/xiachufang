@@ -1,0 +1,31 @@
+# IntelliJ IDEA
+.idea/
+*.iml
+out/
+
+# macOS
+.DS_Store
+
+# Java / Maven
+target/
+*.log
+
+# Frontend build artifacts
+chat-ui/node_modules/
+chat-ui/dist/
+chat-ui/.vite/
+chat-ui/*.tsbuildinfo
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Local Spring overrides
+application.properties
+application-local.properties
+application-local.yml
+application-local.yaml
+src/main/resources/application-local.properties
+src/main/resources/application-local.yml
+src/main/resources/application-local.yaml
