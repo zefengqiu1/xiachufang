@@ -1,4 +1,4 @@
-package com.webcrawler.recipe.app.service;
+package com.webcrawler.recipe.app.util;
 
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;

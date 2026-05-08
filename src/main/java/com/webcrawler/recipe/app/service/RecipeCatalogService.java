@@ -5,6 +5,8 @@ import com.webcrawler.recipe.app.model.recipe.RecipeSummary;
 import com.webcrawler.recipe.app.repository.FileRecipeRepository;
 import java.util.Comparator;
 import java.util.List;
+
+import com.webcrawler.recipe.app.util.RecipeNormalizer;
 import org.springframework.stereotype.Service;
 
 @Service

@@ -1,4 +1,4 @@
-package com.webcrawler.recipe.app.service;
+package com.webcrawler.recipe.app.service.websearch;
 
 import com.webcrawler.recipe.app.model.web.WebPageExtract;
 import java.util.ArrayList;

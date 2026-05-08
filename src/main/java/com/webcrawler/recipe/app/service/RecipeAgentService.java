@@ -9,6 +9,11 @@ import com.webcrawler.recipe.app.model.chat.RecipeAskResponse;
 import com.webcrawler.recipe.app.model.search.RecipeMatch;
 import com.webcrawler.recipe.app.model.search.RecipeSearchHit;
 import com.webcrawler.recipe.app.model.search.RecipeSource;
+import com.webcrawler.recipe.app.service.websearch.WebRecipeFallbackService;
+import com.webcrawler.recipe.app.tool.RecipeTools;
+import com.webcrawler.recipe.app.util.RecipeAssistant;
+import com.webcrawler.recipe.app.util.RecipeNormalizer;
+import com.webcrawler.recipe.app.util.RecipePromptBuilder;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import java.util.LinkedHashMap;
@@ -37,11 +42,11 @@ public class RecipeAgentService {
 
     public RecipeAgentService(
             RecipeNormalizer recipeNormalizer,
-            RecipeSearchService recipeSearchService,
-            RecipePromptBuilder recipePromptBuilder,
-            RecipeRenderService recipeRenderService,
-            Optional<ChatLanguageModel> chatLanguageModel,
-            WebRecipeFallbackService webRecipeFallbackService,
+            RecipeSearchService recipeSearchService, // 去内存找向量近似最高的
+            RecipePromptBuilder recipePromptBuilder, // 给AI
+            RecipeRenderService recipeRenderService, // reply 本地
+            Optional<ChatLanguageModel> chatLanguageModel, //模型
+            WebRecipeFallbackService webRecipeFallbackService, // 如果本地找不到就联网找
             ObjectMapper objectMapper,
             RecipeTools recipeTools) {
         this.recipeNormalizer = recipeNormalizer;
@@ -75,7 +80,7 @@ public class RecipeAgentService {
                         metadata
                 );
             } catch (Exception e) {
-                log.warn("AI tools chat failed, falling back to deterministic flow: {}", e.getMessage());
+                log.warn("AI tools chat failed: sessionId={}, error={}, falling back to deterministic flow", sessionId, e.getMessage(), e);
             }
         }
 

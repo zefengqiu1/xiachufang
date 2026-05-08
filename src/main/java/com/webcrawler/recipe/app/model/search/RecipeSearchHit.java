@@ -4,6 +4,18 @@ import com.webcrawler.recipe.app.model.recipe.RecipeChunk;
 import com.webcrawler.recipe.app.model.recipe.RecipeIndexedDocument;
 import java.util.List;
 
+/**
+ *
+ * @param recipe
+ * @param totalScore
+ * @param nameScore
+ * @param keywordScore
+ * @param vectorScore
+ * @param confidence
+ * @param contextChunks
+ *
+ * 用来返回本地搜索的返回
+ */
 public record RecipeSearchHit(
         RecipeIndexedDocument recipe,
         double totalScore,

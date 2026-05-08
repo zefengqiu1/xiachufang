@@ -1,11 +1,10 @@
-package com.webcrawler.recipe.app.service;
+package com.webcrawler.recipe.app.service.websearch;
 
 import com.webcrawler.recipe.app.model.web.WebSearchResult;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;

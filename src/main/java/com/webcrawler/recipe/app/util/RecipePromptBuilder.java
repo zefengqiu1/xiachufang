@@ -1,4 +1,4 @@
-package com.webcrawler.recipe.app.service;
+package com.webcrawler.recipe.app.util;
 
 import com.webcrawler.recipe.app.model.recipe.RecipeChunk;
 import com.webcrawler.recipe.app.model.search.RecipeSearchHit;

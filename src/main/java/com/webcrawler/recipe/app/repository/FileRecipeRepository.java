@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webcrawler.recipe.app.model.recipe.RecipeDocument;
 import com.webcrawler.recipe.app.model.recipe.RecipeIndexedDocument;
 import com.webcrawler.recipe.app.service.RecipeChunkBuilder;
-import com.webcrawler.recipe.app.service.RecipeNormalizer;
+import com.webcrawler.recipe.app.util.RecipeNormalizer;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.nio.file.Files;

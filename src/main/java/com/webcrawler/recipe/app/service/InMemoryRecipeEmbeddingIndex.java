@@ -11,6 +11,35 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+
+/**
+ *
+ * Embedding 是干嘛的
+ *
+ * LLM（大模型）不能直接高效做“海量文本相似搜索”，所以需要：
+ *
+ * 把文本转成向量
+ * 存到向量数据库
+ * 用户提问时也转向量
+ * 比较“距离”
+ * 找出最相似内容
+ *
+ * 这就是：
+ *
+ * RAG（检索增强生成）
+ * AI 知识库
+ * 文档问答
+ * 语义搜索
+ *
+ * 的核心。
+ *
+ */
+
+/**
+ * 系统已启动就把所有内存里的菜谱名字进行vector数值化，然后存进embeddings,
+ * similarity 函数，把输入参数和已有菜谱名字进行对比vector对比
+ * cosine 函数 是计算公式
+ */
 @Service
 public class InMemoryRecipeEmbeddingIndex {
 
@@ -65,7 +94,7 @@ public class InMemoryRecipeEmbeddingIndex {
         }
         try {
             float[] queryVector = embeddingModel.get().embed(query).content().vector();
-            return cosine(queryVector, recipeVector);
+            return cosine(queryVector, recipeVector); // 进行对比
         } catch (Exception e) {
             available = false;
             embeddings.clear();

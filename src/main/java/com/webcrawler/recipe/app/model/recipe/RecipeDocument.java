@@ -2,8 +2,28 @@ package com.webcrawler.recipe.app.model.recipe;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.util.List;
 
+/**
+ * 用来读取caipu.txt的对象
+ * @param id
+ * @param name
+ * @param description
+ * @param sourcePath
+ * @param imagePath
+ * @param images
+ * @param category
+ * @param difficulty
+ * @param tags
+ * @param servings
+ * @param ingredients
+ * @param steps
+ * @param prepTimeMinutes
+ * @param cookTimeMinutes
+ * @param totalTimeMinutes
+ * @param additionalNotes
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record RecipeDocument(
         String id,

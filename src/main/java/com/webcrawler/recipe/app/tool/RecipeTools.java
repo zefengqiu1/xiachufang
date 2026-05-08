@@ -1,8 +1,12 @@
-package com.webcrawler.recipe.app.service;
+package com.webcrawler.recipe.app.tool;
 
 import com.webcrawler.recipe.app.model.search.RecipeSearchHit;
 import com.webcrawler.recipe.app.model.web.WebPageExtract;
 import com.webcrawler.recipe.app.model.web.WebSearchResult;
+import com.webcrawler.recipe.app.service.RecipeRenderService;
+import com.webcrawler.recipe.app.service.RecipeSearchService;
+import com.webcrawler.recipe.app.service.websearch.WebPageExtractorService;
+import com.webcrawler.recipe.app.service.websearch.WebSearchService;
 import dev.langchain4j.agent.tool.Tool;
 import java.util.List;
 import org.springframework.stereotype.Component;

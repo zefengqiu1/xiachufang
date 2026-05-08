@@ -6,8 +6,15 @@ import com.webcrawler.recipe.app.model.search.RecipeSearchHit;
 import com.webcrawler.recipe.app.repository.FileRecipeRepository;
 import java.util.Comparator;
 import java.util.List;
+
+import com.webcrawler.recipe.app.util.RecipeNormalizer;
 import org.springframework.stereotype.Service;
 
+
+/**
+ * searchBest函数：计算query 的vector score 和菜谱的id 的相似读，返回score 最高的。
+ *
+ */
 @Service
 public class RecipeSearchService {
 
