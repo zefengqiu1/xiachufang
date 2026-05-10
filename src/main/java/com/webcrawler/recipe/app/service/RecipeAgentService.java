@@ -1,7 +1,5 @@
 package com.webcrawler.recipe.app.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webcrawler.recipe.app.model.chat.ChatRequest;
 import com.webcrawler.recipe.app.model.chat.ChatResponse;
 import com.webcrawler.recipe.app.model.chat.RecipeAskRequest;
@@ -14,17 +12,19 @@ import com.webcrawler.recipe.app.tool.RecipeTools;
 import com.webcrawler.recipe.app.util.RecipeAssistant;
 import com.webcrawler.recipe.app.util.RecipeNormalizer;
 import com.webcrawler.recipe.app.util.RecipePromptBuilder;
+import com.webcrawler.recipe.app.util.RecipeStreamingAssistant;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.StreamingChatLanguageModel;
+import dev.langchain4j.service.TokenStream;
 import java.util.LinkedHashMap;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.lang.Nullable;
 
 @Service
 public class RecipeAgentService {
@@ -35,19 +35,19 @@ public class RecipeAgentService {
     private final RecipeSearchService recipeSearchService;
     private final RecipePromptBuilder recipePromptBuilder;
     private final RecipeRenderService recipeRenderService;
-    private final Optional<ChatLanguageModel> chatLanguageModel;
+    private final ChatLanguageModel chatLanguageModel;
     private final WebRecipeFallbackService webRecipeFallbackService;
-    private final ObjectMapper objectMapper;
-    private final Optional<RecipeAssistant> recipeAssistant;
+    private final RecipeAssistant recipeAssistant;
+    private final RecipeStreamingAssistant recipeStreamingAssistant;
 
     public RecipeAgentService(
             RecipeNormalizer recipeNormalizer,
             RecipeSearchService recipeSearchService, // 去内存找向量近似最高的
             RecipePromptBuilder recipePromptBuilder, // 给AI
             RecipeRenderService recipeRenderService, // reply 本地
-            Optional<ChatLanguageModel> chatLanguageModel, //模型
+            @Nullable ChatLanguageModel chatLanguageModel, //模型
+            @Nullable StreamingChatLanguageModel streamingChatLanguageModel,
             WebRecipeFallbackService webRecipeFallbackService, // 如果本地找不到就联网找
-            ObjectMapper objectMapper,
             RecipeTools recipeTools) {
         this.recipeNormalizer = recipeNormalizer;
         this.recipeSearchService = recipeSearchService;
@@ -55,11 +55,14 @@ public class RecipeAgentService {
         this.recipeRenderService = recipeRenderService;
         this.chatLanguageModel = chatLanguageModel;
         this.webRecipeFallbackService = webRecipeFallbackService;
-        this.objectMapper = objectMapper;
-        this.recipeAssistant = chatLanguageModel.map(model -> AiServices.builder(RecipeAssistant.class)
-                .chatLanguageModel(model)
+        this.recipeAssistant = chatLanguageModel == null ? null : AiServices.builder(RecipeAssistant.class)
+                .chatLanguageModel(chatLanguageModel)
                 .tools(recipeTools)
-                .build());
+                .build();
+        this.recipeStreamingAssistant = streamingChatLanguageModel == null ? null : AiServices.builder(RecipeStreamingAssistant.class)
+                .streamingChatLanguageModel(streamingChatLanguageModel)
+                .tools(recipeTools)
+                .build();
     }
 
     public ChatResponse chat(ChatRequest request) {
@@ -68,9 +71,9 @@ public class RecipeAgentService {
                 : request.sessionId();
         String message = request.message() == null ? "" : request.message().trim();
 
-        if (recipeAssistant.isPresent() && !message.isBlank()) {
+        if (recipeAssistant != null && !message.isBlank()) {
             try {
-                String reply = recipeAssistant.get().chat(message);
+                String reply = recipeAssistant.chat(message);
                 Map<String, Object> metadata = new LinkedHashMap<>();
                 metadata.put("answerMode", "ai_tools");
                 return new ChatResponse(
@@ -153,40 +156,24 @@ public class RecipeAgentService {
     }
 
     private String renderReply(String query, String normalizedQuery, RecipeSearchHit hit) {
-        if (chatLanguageModel.isEmpty()) {
+        if (chatLanguageModel == null) {
             return recipeRenderService.render(hit, query);
         }
         try {
             String prompt = recipePromptBuilder.build(query, normalizedQuery, hit);
             log.info("Recipe chat prompt for query '{}':\n{}", normalizedQuery, prompt);
-            return chatLanguageModel.get().generate(prompt);
+            return chatLanguageModel.generate(prompt);
         } catch (Exception e) {
             log.warn("Chat model failed for query '{}', falling back to local renderer: {}", normalizedQuery, e.getMessage());
             return recipeRenderService.render(hit, query);
         }
     }
 
-    public List<String> splitForStreaming(String reply) {
-        if (reply == null || reply.isBlank()) {
-            return List.of();
+    @Nullable
+    public TokenStream streamChat(String message) {
+        if (recipeStreamingAssistant == null || message == null || message.isBlank()) {
+            return null;
         }
-        List<String> chunks = new ArrayList<>();
-        String[] lines = reply.split("\n", -1);
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i];
-            String chunk = i < lines.length - 1 ? line + "\n" : line;
-            if (!chunk.isEmpty()) {
-                chunks.add(chunk);
-            }
-        }
-        return chunks;
-    }
-
-    public String toJson(Map<String, Object> payload) {
-        try {
-            return objectMapper.writeValueAsString(payload);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize stream payload", e);
-        }
+        return recipeStreamingAssistant.chat(message.trim());
     }
 }

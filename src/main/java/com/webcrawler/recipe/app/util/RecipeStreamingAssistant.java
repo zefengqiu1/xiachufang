@@ -1,12 +1,10 @@
 package com.webcrawler.recipe.app.util;
 
 import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
 
-/**
- * 系统提示词：角色，任务，输入输出+例子
- */
-public interface RecipeAssistant {
+public interface RecipeStreamingAssistant {
 
     @SystemMessage("""
             你是一个中文菜谱助手。
@@ -18,5 +16,5 @@ public interface RecipeAssistant {
             5. 不要暴露工具调用细节，不要说“我调用了某个工具”。
             6. 如果来源里没有精确克数，就明确说原始菜谱未给出精确分量。
             """)
-    String chat(@UserMessage String userMessage);
+    TokenStream chat(@UserMessage String userMessage);
 }

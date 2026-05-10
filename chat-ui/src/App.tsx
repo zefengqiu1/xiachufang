@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useState } from "react";
 import { streamChatMessage } from "./api";
 import type { ChatMessage } from "./types";
 
@@ -21,67 +21,12 @@ export default function App() {
   const [input, setInput] = useState("宫保鸡丁怎么做？");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const typingTimerRef = useRef<number | null>(null);
-  const pendingTextRef = useRef("");
-  const activeAssistantIdRef = useRef<string | null>(null);
-  const streamFinishedRef = useRef(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     createMessage(
       "assistant",
       "直接输入菜名和问题，例如“宫保鸡丁怎么做？”。系统会优先返回本地菜谱库里的结果。",
     ),
   ]);
-
-  useEffect(() => {
-    return () => {
-      if (typingTimerRef.current !== null) {
-        window.clearInterval(typingTimerRef.current);
-      }
-    };
-  }, []);
-
-  function startTyping() {
-    if (typingTimerRef.current !== null) {
-      return;
-    }
-
-    typingTimerRef.current = window.setInterval(() => {
-      const assistantId = activeAssistantIdRef.current;
-      if (!assistantId) {
-        stopTypingIfDone();
-        return;
-      }
-
-      if (!pendingTextRef.current) {
-        stopTypingIfDone();
-        return;
-      }
-
-      const chunk = pendingTextRef.current.slice(0, 2);
-      pendingTextRef.current = pendingTextRef.current.slice(2);
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === assistantId
-            ? { ...message, text: message.text + chunk }
-            : message,
-        ),
-      );
-
-      stopTypingIfDone();
-    }, 18);
-  }
-
-  function stopTypingIfDone() {
-    if (!streamFinishedRef.current || pendingTextRef.current.length > 0) {
-      return;
-    }
-    if (typingTimerRef.current !== null) {
-      window.clearInterval(typingTimerRef.current);
-      typingTimerRef.current = null;
-    }
-    activeAssistantIdRef.current = null;
-    setLoading(false);
-  }
 
   async function submitQuestion(event?: FormEvent<HTMLFormElement>, preset?: string) {
     event?.preventDefault();
@@ -93,9 +38,6 @@ export default function App() {
     setError(null);
     setLoading(true);
     const assistantId = `assistant-${crypto.randomUUID()}`;
-    activeAssistantIdRef.current = assistantId;
-    pendingTextRef.current = "";
-    streamFinishedRef.current = false;
     setMessages((current) => [
       ...current,
       createMessage("user", question),
@@ -116,14 +58,18 @@ export default function App() {
         }
 
         if (event.type === "chunk") {
-          pendingTextRef.current += event.content;
-          startTyping();
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantId
+                ? { ...message, text: message.text + event.content }
+                : message,
+            ),
+          );
           return;
         }
 
         if (event.type === "end") {
-          streamFinishedRef.current = true;
-          stopTypingIfDone();
+          setLoading(false);
         }
       });
     } catch (err) {
@@ -133,17 +79,8 @@ export default function App() {
         ...current.filter((item) => item.id !== assistantId),
         createMessage("assistant", "后端请求失败，请确认 `http://localhost:8091/api/chat/stream` 可用。"),
       ]);
-      pendingTextRef.current = "";
-      streamFinishedRef.current = true;
-      activeAssistantIdRef.current = null;
-      if (typingTimerRef.current !== null) {
-        window.clearInterval(typingTimerRef.current);
-        typingTimerRef.current = null;
-      }
     } finally {
-      if (streamFinishedRef.current && pendingTextRef.current.length === 0) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }
 
@@ -171,7 +108,7 @@ export default function App() {
               <p className="chat-label">菜谱问答</p>
               <h2>本地知识库优先</h2>
             </div>
-            <span className="chat-status">{loading ? "正在流式返回..." : "后端地址：/api/chat/stream"}</span>
+            <span className="chat-status">{loading ? "正在返回..." : "后端地址：/api/chat/stream"}</span>
           </div>
 
           <div className="message-list">

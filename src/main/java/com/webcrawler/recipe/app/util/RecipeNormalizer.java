@@ -47,7 +47,7 @@ public class RecipeNormalizer {
                 .replaceAll("\\s+", "")
                 .trim();
     }
-
+    //  canonicalName , description. category,tags,ingredient
     public String buildSearchText(RecipeDocument recipe, String canonicalName) {
         List<String> parts = new ArrayList<>();
         parts.add(canonicalName);
