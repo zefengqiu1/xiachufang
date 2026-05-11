@@ -1,7 +1,7 @@
 package com.webcrawler.recipe.app.model.search;
 
 import com.webcrawler.recipe.app.model.recipe.RecipeChunk;
-import com.webcrawler.recipe.app.model.recipe.RecipeIndexedDocument;
+import com.webcrawler.recipe.app.model.recipe.RecipeDocument;
 import java.util.List;
 
 /**
@@ -17,7 +17,8 @@ import java.util.List;
  * 用来返回本地搜索的返回
  */
 public record RecipeSearchHit(
-        RecipeIndexedDocument recipe,
+        RecipeDocument recipe,
+        String canonicalName,
         double totalScore,
         double nameScore,
         double keywordScore,

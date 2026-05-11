@@ -13,9 +13,9 @@ import org.springframework.stereotype.Service;
 public class RecipeRenderService {
 
     public String render(RecipeSearchHit hit, String rawQuery) {
-        RecipeDocument recipe = hit.recipe().document();
+        RecipeDocument recipe = hit.recipe();
         List<String> lines = new ArrayList<>();
-        lines.add("菜名：" + hit.recipe().canonicalName());
+        lines.add("菜名：" + hit.canonicalName());
         lines.add("");
         lines.add("简介：" + excerpt(recipe.description()));
         lines.add("");

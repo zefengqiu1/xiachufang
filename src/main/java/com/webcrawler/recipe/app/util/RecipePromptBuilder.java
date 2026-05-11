@@ -32,6 +32,6 @@ public class RecipePromptBuilder {
 
                 菜谱上下文：
                 %s
-                """.formatted(rawQuery, normalizedQuery, hit.recipe().canonicalName(), context);
+                """.formatted(rawQuery, normalizedQuery, hit.canonicalName(), context);
     }
 }
