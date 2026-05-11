@@ -22,6 +22,7 @@ import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.query.Query;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.TokenStream;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -173,6 +174,11 @@ public class RecipeAgentService {
     }
 
     private RecipeSearchHit searchBest(String normalizedQuery) {
+        RecipeSearchHit directHit = directNameHit(normalizedQuery);
+        if (directHit != null) {
+            return directHit;
+        }
+
         List<Content> contents = contentRetriever.retrieve(Query.from(normalizedQuery));
         if (contents.isEmpty()) {
             return null;
@@ -225,6 +231,51 @@ public class RecipeAgentService {
                 keywordScore,
                 retrievalScore,
                 confidence,
+                contextChunks
+        );
+    }
+
+    private RecipeSearchHit directNameHit(String normalizedQuery) {
+        RecipeDocument bestRecipe = null;
+        double bestScore = 0.0D;
+
+        for (RecipeDocument recipe : recipeDocumentsById.values()) {
+            String canonicalName = recipeNormalizer.toCanonicalName(recipe.name());
+            String normalizedName = recipeNormalizer.normalize(canonicalName);
+            double score;
+
+            if (normalizedName.equals(normalizedQuery)) {
+                score = 1.0D;
+            } else if (normalizedName.contains(normalizedQuery) || normalizedQuery.contains(normalizedName)) {
+                score = 0.92D;
+            } else {
+                score = overlapScore(normalizedName, normalizedQuery);
+            }
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestRecipe = recipe;
+            }
+        }
+
+        if (bestRecipe == null || bestScore < 0.85D) {
+            return null;
+        }
+
+        String canonicalName = recipeNormalizer.toCanonicalName(bestRecipe.name());
+        List<RecipeChunk> contextChunks = retrievalChunksByDishId.getOrDefault(bestRecipe.id(), List.of()).stream()
+                .sorted(java.util.Comparator.comparingDouble((RecipeChunk chunk) -> chunkScore(chunk, normalizedQuery)).reversed())
+                .limit(3)
+                .toList();
+
+        return new RecipeSearchHit(
+                bestRecipe,
+                canonicalName,
+                bestScore,
+                bestScore,
+                bestScore,
+                bestScore,
+                bestScore,
                 contextChunks
         );
     }

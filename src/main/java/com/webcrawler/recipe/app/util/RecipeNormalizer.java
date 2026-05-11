@@ -34,6 +34,7 @@ public class RecipeNormalizer {
                 .replace("怎么烧", "")
                 .replace("怎么弄", "")
                 .trim();
+        normalized = normalizeAliases(normalized);
         return normalized;
     }
 
@@ -41,11 +42,11 @@ public class RecipeNormalizer {
         if (text == null) {
             return "";
         }
-        return text
+        return normalizeAliases(text
                 .toLowerCase(Locale.ROOT)
                 .replaceAll("[\\p{Punct}\\p{IsPunctuation}]", " ")
                 .replaceAll("\\s+", "")
-                .trim();
+                .trim());
     }
     //  canonicalName , description. category,tags,ingredient
     public String buildSearchText(RecipeDocument recipe, String canonicalName) {
@@ -100,5 +101,14 @@ public class RecipeNormalizer {
                 .replaceAll("\\[(.+?)]\\((.+?)\\)", "$1")
                 .replace("\r", "")
                 .trim();
+    }
+
+    private String normalizeAliases(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        return text
+                .replace("宫爆", "宫保")
+                .replace("鱼香肉末", "鱼香肉丝");
     }
 }

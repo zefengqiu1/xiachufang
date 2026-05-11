@@ -3,7 +3,9 @@ package com.webcrawler.recipe.app.retriever;
 import com.webcrawler.recipe.app.model.recipe.RecipeChunk;
 import com.webcrawler.recipe.app.model.recipe.ScoredRecipeChunk;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 public class BM25RecipeRetriever {
 
@@ -30,7 +32,7 @@ public class BM25RecipeRetriever {
 
     private double bm25Like(String query, String doc) {
 
-        String[] qTokens = query.toLowerCase().split("\\s+");
+        List<String> qTokens = tokenize(query);
         String lowerDoc = doc.toLowerCase();
 
         double score = 0;
@@ -55,5 +57,28 @@ public class BM25RecipeRetriever {
         }
 
         return count;
+    }
+
+    private List<String> tokenize(String text) {
+        String normalized = text == null ? "" : text.toLowerCase().trim();
+        if (normalized.isBlank()) {
+            return List.of();
+        }
+
+        Set<String> tokens = new LinkedHashSet<>();
+        for (String token : normalized.split("\\s+")) {
+            if (!token.isBlank()) {
+                tokens.add(token);
+            }
+        }
+
+        if (tokens.size() <= 1 && normalized.indexOf(' ') < 0 && normalized.length() > 1) {
+            for (int i = 0; i < normalized.length() - 1; i++) {
+                tokens.add(normalized.substring(i, i + 2));
+            }
+            tokens.add(normalized);
+        }
+
+        return List.copyOf(tokens);
     }
 }
