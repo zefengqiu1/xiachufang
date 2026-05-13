@@ -45,12 +45,6 @@
         </dependency>
 
 
-        <!-- ONNX Runtime (CrossEncoder) -->
-        <dependency>
-            <groupId>com.microsoft.onnxruntime</groupId>
-            <artifactId>onnxruntime</artifactId>
-            <version>1.18.0</version>
-        </dependency>
 
         <dependency>
             <groupId>dev.langchain4j</groupId>
@@ -61,6 +55,12 @@
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-open-ai</artifactId>
+            <version>${langchain4j.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-cohere</artifactId>
             <version>${langchain4j.version}</version>
         </dependency>
 

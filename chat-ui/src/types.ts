@@ -6,13 +6,6 @@ export type ChatMessage = {
   text: string;
 };
 
-export type ChatResponse = {
-  sessionId: string;
-  reply: string;
-  usedTools: string[];
-  metadata: Record<string, unknown>;
-};
-
 export type ChatStreamEvent =
   | {
       type: "start";

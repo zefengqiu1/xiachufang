@@ -1,25 +1,6 @@
-import type { ChatResponse, ChatStreamEvent } from "./types";
+import type { ChatStreamEvent } from "./types";
 
 const API_BASE = "/api";
-
-export async function sendChatMessage(payload: {
-  sessionId: string | null;
-  message: string;
-}): Promise<ChatResponse> {
-  const response = await fetch(`${API_BASE}/chat`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Chat request failed: ${response.status}`);
-  }
-
-  return response.json();
-}
 
 export async function streamChatMessage(
   payload: {

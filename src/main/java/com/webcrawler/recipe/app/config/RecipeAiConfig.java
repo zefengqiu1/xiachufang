@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webcrawler.recipe.app.model.recipe.RecipeChunk;
 import com.webcrawler.recipe.app.model.recipe.RecipeDocument;
 import com.webcrawler.recipe.app.retriever.BM25RecipeRetriever;
+import com.webcrawler.recipe.app.retriever.CohereRecipeReranker;
 import com.webcrawler.recipe.app.retriever.HybridRecipeRetriever;
 import com.webcrawler.recipe.app.retriever.VectorRecipeRetriever;
 import com.webcrawler.recipe.app.util.RecipeDocumentChunker;
@@ -13,6 +14,8 @@ import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.chat.StreamingChatLanguageModel;
+
+import dev.langchain4j.model.cohere.CohereScoringModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.embedding.onnx.allminilml6v2.AllMiniLmL6V2EmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
@@ -45,13 +48,17 @@ public class RecipeAiConfig {
             @Value("${langchain4j.open-ai.base-url:https://api.deepseek.com}") String baseUrl,
             @Value("${langchain4j.open-ai.model:deepseek-chat}") String modelName,
             @Value("${langchain4j.open-ai.timeout:PT60S}") Duration timeout,
-            @Value("${langchain4j.open-ai.max-retries:2}") Integer maxRetries) {
+            @Value("${langchain4j.open-ai.max-retries:2}") Integer maxRetries,
+            @Value("${langchain4j.open-ai.chat-model.log-requests:false}") Boolean logRequests,
+            @Value("${langchain4j.open-ai.chat-model.log-responses:false}") Boolean logResponses) {
         return OpenAiChatModel.builder()
                 .apiKey(apiKey)
                 .baseUrl(baseUrl)
                 .modelName(modelName)
                 .timeout(timeout)
                 .maxRetries(maxRetries)
+                .logRequests(logRequests)
+                .logResponses(logResponses)
                 .build();
     }
 
@@ -61,12 +68,16 @@ public class RecipeAiConfig {
             @Value("${langchain4j.open-ai.api-key}") String apiKey,
             @Value("${langchain4j.open-ai.base-url:https://api.deepseek.com}") String baseUrl,
             @Value("${langchain4j.open-ai.model:deepseek-chat}") String modelName,
-            @Value("${langchain4j.open-ai.timeout:PT60S}") Duration timeout) {
+            @Value("${langchain4j.open-ai.timeout:PT60S}") Duration timeout,
+            @Value("${langchain4j.open-ai.chat-model.log-requests:false}") Boolean logRequests,
+            @Value("${langchain4j.open-ai.chat-model.log-responses:false}") Boolean logResponses) {
         return OpenAiStreamingChatModel.builder()
                 .apiKey(apiKey)
                 .baseUrl(baseUrl)
                 .modelName(modelName)
                 .timeout(timeout)
+                .logRequests(logRequests)
+                .logResponses(logResponses)
                 .build();
     }
 
@@ -148,8 +159,47 @@ public class RecipeAiConfig {
     @Bean
     HybridRecipeRetriever hybridRecipeRetriever(
             BM25RecipeRetriever bm25RecipeRetriever,
-            VectorRecipeRetriever vectorRecipeRetriever) {
-        return new HybridRecipeRetriever(bm25RecipeRetriever, vectorRecipeRetriever);
+            VectorRecipeRetriever vectorRecipeRetriever,
+            CohereRecipeReranker cohereRecipeReranker,
+            @Value("${recipe.debug.rag:false}") boolean debugRag) {
+        return new HybridRecipeRetriever(bm25RecipeRetriever, vectorRecipeRetriever, cohereRecipeReranker, debugRag);
+    }
+
+    @Bean
+    CohereRecipeReranker cohereRecipeReranker(
+            ObjectMapper objectMapper,
+            CohereScoringModel cohereScoringModel,
+            @Value("${recipe.rerank.enabled:false}") boolean enabled,
+            @Value("${recipe.debug.rag:false}") boolean debugRag,
+            @Value("${recipe.rerank.top-n:10}") int topN) {
+        return new CohereRecipeReranker(
+                objectMapper,
+                cohereScoringModel,
+                topN,
+                enabled,
+                debugRag
+        );
+    }
+
+    @Bean
+    @ConditionalOnExpression("T(org.springframework.util.StringUtils).hasText('${recipe.rerank.cohere.api-key:}')")
+    CohereScoringModel cohereScoringModel(
+            @Value("${recipe.rerank.cohere.api-key}") String apiKey,
+            @Value("${recipe.rerank.cohere.model:rerank-multilingual-v3.0}") String model,
+            @Value("${recipe.rerank.cohere.base-url:https://api.cohere.com}") String baseUrl,
+            @Value("${recipe.rerank.cohere.timeout:PT20S}") Duration timeout,
+            @Value("${recipe.rerank.cohere.max-retries:2}") Integer maxRetries,
+            @Value("${recipe.rerank.cohere.log-requests:false}") Boolean logRequests,
+            @Value("${recipe.rerank.cohere.log-responses:false}") Boolean logResponses) {
+        return CohereScoringModel.builder()
+                .apiKey(apiKey)
+                .modelName(model)
+                .baseUrl(baseUrl)
+                .timeout(timeout)
+                .maxRetries(maxRetries)
+                .logRequests(logRequests)
+                .logResponses(logResponses)
+                .build();
     }
 
     @Bean

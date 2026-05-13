@@ -2,12 +2,12 @@ package com.webcrawler.recipe.app.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webcrawler.recipe.app.model.chat.ChatRequest;
-import com.webcrawler.recipe.app.model.chat.ChatResponse;
 import com.webcrawler.recipe.app.model.chat.RecipeAskRequest;
 import com.webcrawler.recipe.app.model.chat.RecipeAskResponse;
 import com.webcrawler.recipe.app.model.recipe.RecipeDocument;
 import com.webcrawler.recipe.app.model.recipe.RecipeSummary;
 import com.webcrawler.recipe.app.service.RecipeAgentService;
+import com.webcrawler.recipe.app.service.RecipeFallbackChatService;
 import com.webcrawler.recipe.app.util.RecipeNormalizer;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.tool.ToolExecution;
@@ -19,7 +19,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -37,7 +40,10 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 @CrossOrigin(origins = "*")
 public class RecipeController {
 
+    private static final Logger log = LoggerFactory.getLogger(RecipeController.class);
+
     private final RecipeAgentService recipeAgentService;
+    private final RecipeFallbackChatService recipeFallbackChatService;
     private final List<RecipeDocument> recipeDocuments;
     private final Map<String, RecipeDocument> recipeDocumentsById;
     private final RecipeNormalizer recipeNormalizer;
@@ -45,20 +51,17 @@ public class RecipeController {
 
     public RecipeController(
             RecipeAgentService recipeAgentService,
+            RecipeFallbackChatService recipeFallbackChatService,
             List<RecipeDocument> recipeDocuments,
             Map<String, RecipeDocument> recipeDocumentsById,
             RecipeNormalizer recipeNormalizer,
             ObjectMapper objectMapper) {
         this.recipeAgentService = recipeAgentService;
+        this.recipeFallbackChatService = recipeFallbackChatService;
         this.recipeDocuments = recipeDocuments;
         this.recipeDocumentsById = recipeDocumentsById;
         this.recipeNormalizer = recipeNormalizer;
         this.objectMapper = objectMapper;
-    }
-
-    @PostMapping("/chat")
-    public ChatResponse chat(@RequestBody ChatRequest request) {
-        return recipeAgentService.chat(request);
     }
 
     @PostMapping(value = "/chat/stream", produces = "application/x-ndjson")
@@ -75,7 +78,7 @@ public class RecipeController {
 
             TokenStream tokenStream = recipeAgentService.streamChat(request.message());
             if (tokenStream == null) {
-                ChatResponse response = recipeAgentService.chat(new ChatRequest(sessionId, request.message()));
+                RecipeAskResponse response = recipeFallbackChatService.ask(new RecipeAskRequest(sessionId, request.message()));
                 synchronized (lock) {
                     writeJsonLine(outputStream, Map.of(
                             "type", "chunk",
@@ -83,8 +86,13 @@ public class RecipeController {
                     ));
                     writeJsonLine(outputStream, Map.of(
                             "type", "end",
-                            "usedTools", response.usedTools(),
-                            "metadata", response.metadata()
+                            "usedTools", List.of("contentRetriever"),
+                            "metadata", Map.of(
+                                    "answerMode", response.answerMode(),
+                                    "normalizedQuery", response.normalizedQuery(),
+                                    "matchedRecipe", response.matchedRecipe(),
+                                    "sources", response.sources()
+                            )
                     ));
                 }
                 return;
@@ -104,7 +112,9 @@ public class RecipeController {
                                 ));
                             }
                         } catch (IOException e) {
+                            log.warn("Streaming chat write failed: sessionId={}, error={}", sessionId, e.getMessage());
                             errorRef.set(e);
+                            done.countDown();
                         }
                     })
                     .onToolExecuted(toolExecution -> recordToolExecution(usedTools, toolExecution))
@@ -121,6 +131,7 @@ public class RecipeController {
                                         "metadata", Map.of("answerMode", "ai_tools_stream")
                                 ));
                             }
+                            log.info("Streaming chat completed: sessionId={}, usedTools={}", sessionId, toolNames);
                         } catch (IOException e) {
                             errorRef.set(e);
                         } finally {
@@ -128,6 +139,7 @@ public class RecipeController {
                         }
                     })
                     .onError(error -> {
+                        log.error("Streaming chat failed: sessionId={}, error={}", sessionId, error.getMessage(), error);
                         errorRef.set(error);
                         done.countDown();
                     })
@@ -147,7 +159,7 @@ public class RecipeController {
 
     @PostMapping("/recipes/ask")
     public RecipeAskResponse ask(@RequestBody RecipeAskRequest request) {
-        return recipeAgentService.ask(request);
+        return recipeFallbackChatService.ask(request);
     }
 
     @GetMapping("/recipes")
@@ -191,11 +203,25 @@ public class RecipeController {
     }
 
     private void awaitCompletion(CountDownLatch done) {
+        boolean interrupted = false;
         try {
-            done.await();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Streaming chat interrupted", e);
+            while (done.getCount() > 0) {
+                try {
+                    if (done.await(250, TimeUnit.MILLISECONDS)) {
+                        return;
+                    }
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                    if (done.getCount() == 0) {
+                        return;
+                    }
+                    log.warn("Streaming chat wait interrupted before completion");
+                }
+            }
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
@@ -206,6 +232,7 @@ public class RecipeController {
         synchronized (usedTools) {
             usedTools.add(toolExecution.request().name());
         }
+        log.info("Streaming tool executed: tool={}", toolExecution.request().name());
     }
 
     private void writeJsonLine(java.io.OutputStream outputStream, Map<String, Object> payload) throws IOException {
