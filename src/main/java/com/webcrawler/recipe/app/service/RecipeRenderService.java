@@ -40,7 +40,7 @@ public class RecipeRenderService {
         lines.add("");
         lines.add("技巧：");
         List<RecipeChunk> notes = hit.contextChunks().stream()
-                .filter(chunk -> "notes".equals(chunk.type()))
+                .filter(chunk -> "notes_technique".equals(chunk.type()))
                 .toList();
         if (notes.isEmpty()) {
             lines.add("- 这份菜谱没有单独的技巧备注，建议按步骤控制火候与调味。");

@@ -87,12 +87,16 @@ public class HybridRecipeRetriever implements ContentRetriever {
 
     private Content toContent(RecipeChunk chunk) {
         Metadata metadata = Metadata.from(Map.of(
+                "chunkId", chunk.getMetadata().getChunkId() == null ? "" : chunk.getMetadata().getChunkId(),
+                "parentChunkId", chunk.getMetadata().getParentChunkId() == null ? "" : chunk.getMetadata().getParentChunkId(),
                 "dishId", chunk.getDishId() == null ? "" : chunk.getDishId(),
                 "dishName", chunk.getDishName() == null ? "" : chunk.getDishName(),
                 "view", chunk.getView() == null ? "" : chunk.getView(),
                 "category", chunk.getCategory() == null ? "" : chunk.getCategory(),
                 "difficulty", chunk.getDifficulty() == null ? "" : String.valueOf(chunk.getDifficulty()),
-                "stepRange", chunk.getStepRange() == null ? "" : chunk.getStepRange()
+                "stepRange", chunk.getStepRange() == null ? "" : chunk.getStepRange(),
+                "stepStart", chunk.getMetadata().getStepStart() == null ? "" : String.valueOf(chunk.getMetadata().getStepStart()),
+                "stepEnd", chunk.getMetadata().getStepEnd() == null ? "" : String.valueOf(chunk.getMetadata().getStepEnd())
         ));
         TextSegment segment = TextSegment.from(chunk.getText(), metadata);
         return Content.from(segment);

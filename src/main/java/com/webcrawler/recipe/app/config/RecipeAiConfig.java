@@ -130,14 +130,7 @@ public class RecipeAiConfig {
 
         for (RecipeChunk chunk : retrievalChunks) {
             Embedding embedding = embeddingModel.embed(chunk.getText()).content();
-            Metadata metadata = Metadata.from(Map.of(
-                    "dishId", defaultString(chunk.getDishId()),
-                    "dishName", defaultString(chunk.getDishName()),
-                    "view", defaultString(chunk.getView()),
-                    "category", defaultString(chunk.getCategory()),
-                    "difficulty", chunk.getDifficulty() == null ? "" : String.valueOf(chunk.getDifficulty()),
-                    "stepRange", defaultString(chunk.getStepRange())
-            ));
+            Metadata metadata = Metadata.from(chunk.getMetadata().asMetadataMap());
             store.add(embedding, TextSegment.from(chunk.getText(), metadata));
         }
 
@@ -206,9 +199,5 @@ public class RecipeAiConfig {
     @Primary
     ContentRetriever contentRetriever(HybridRecipeRetriever hybridRecipeRetriever) {
         return hybridRecipeRetriever;
-    }
-
-    private static String defaultString(String value) {
-        return value == null ? "" : value;
     }
 }

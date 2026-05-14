@@ -1,45 +1,135 @@
-# Recipe Agent
+# Recipe Agent / 菜谱问答助手
 
-一个面向中文菜谱问答场景的示例项目。
+This README is bilingual.  
+English comes first, followed by the Chinese version.  
+本文档为中英双语版本。  
+前半部分是英文，后半部分是中文。
 
-- 后端：`Spring Boot 3 + LangChain4j`
-- 前端：`React + Vite`
-- 数据源：根目录 `caipu.txt`
-- 检索链路：`BM25 + Vector -> RRF -> Cohere Rerank`
-- 兜底链路：本地菜谱命中不足时，联网搜索并抽取网页内容
+---
 
-这份 README 以“第一次接手项目的人能直接跑起来”为目标，同时补齐当前实现里的关键点：混合检索、Cohere rerank、调试日志、以及 CRISPE prompt。
+## English
 
-## 1. 项目能力
+### 1. Overview
 
-用户可以输入这类问题：
+This is a sample project for Chinese recipe question answering.
 
-- `宫保鸡丁怎么做？`
-- `鱼香肉丝里的肉怎么腌？`
-- `麻婆豆腐为什么容易出水？`
-- `红烧排骨先焯水还是先炒糖色？`
+- Backend: `Spring Boot 3 + LangChain4j`
+- Frontend: `React + Vite`
+- Data source: `caipu.txt` in the repo root
+- Retrieval pipeline: `BM25 + Vector -> RRF -> Cohere Rerank`
+- Fallback pipeline: web search + page extraction when local confidence is not sufficient
 
-系统当前有两条主要回答路径：
+The system currently supports three main paths:
 
-1. `本地 RAG`
-   - 规范化 query
-   - 名称直达命中
-   - 否则走 `BM25 + vector` 检索
-   - 用 `RRF` 融合候选
-   - 可选使用 `Cohere rerank` 做二次排序
-   - 最终用本地渲染器或大模型回答
+1. Local RAG QA
+2. Web fallback QA
+3. Streaming chat with LangChain4j `AiServices` and tools
 
-2. `Web fallback`
-   - 本地命中不可靠时
-   - 搜索网页菜谱
-   - 抽取正文、食材、步骤、技巧
-   - 用规则渲染或大模型整理回答
+---
 
-另外，项目还支持一条 `AI tools + streaming` 聊天链路：如果配置了 `StreamingChatLanguageModel`，`/api/chat/stream` 会优先走 LangChain4j `AiServices`；否则自动回退到本地菜谱问答服务。
+### 2. Current Architecture
 
-## 2. 技术栈
+#### 2.1 Retrieval and Answering Flow
 
-### 后端
+```mermaid
+flowchart TD
+    A[Receive user query] --> B[Normalize query]
+    B --> C{Direct recipe-name hit?}
+    C -->|Yes| D[Generate local answer directly]
+    C -->|No| E[BM25 retrieval]
+    C -->|No| F[Vector retrieval]
+    E --> G[RRF fusion]
+    F --> G
+    G --> H{Cohere rerank enabled?}
+    H -->|Yes| I[Cohere reranking]
+    H -->|No| J[Use RRF order directly]
+    I --> K[Generate local answer]
+    J --> K
+    K --> L{Local confidence high enough?}
+    L -->|Yes| M[Return local_rag]
+    L -->|No| N[Web search + extraction]
+    N --> O[Generate web_fallback answer]
+    D --> M
+```
+
+#### 2.2 Prompt Strategy
+
+The answer prompts now use a compact `CRISPE` structure:
+
+- `RecipePromptBuilder` for local RAG answers
+- `WebRecipePromptBuilder` for web fallback answers
+
+Goals:
+
+- answer with the conclusion first
+- stay grounded in the provided context
+- explicitly say when information is missing
+- reduce boilerplate and unsupported elaboration
+
+#### 2.3 Chunking Strategy
+
+Chunking has been redesigned from “splitting steps into tiny fragments and stitching them back” into a structure-aware multi-view chunking strategy.
+
+Each recipe now produces:
+
+- `summary`
+- `ingredients_full`
+- `ingredients_terms`
+- `steps_window`
+- `notes_technique`
+- `recipe_parent_light`
+
+Design intent:
+
+- `summary`: high-level recipe facts such as category, difficulty, servings, time, tags
+- `ingredients_full`: preserves original ingredient expressions
+- `ingredients_terms`: normalized ingredient terms, mainly for BM25
+- `steps_window`: slices original steps into windows, currently `3` steps with `1` step overlap
+- `notes_technique`: notes and technique-focused content derived from explicit notes and step text
+- `recipe_parent_light`: lightweight parent chunk for full-recipe level recall and context recovery
+
+This is better suited for structured recipe documents because it respects:
+
+- ingredient boundaries
+- original step numbering
+- note / technique boundaries
+- full-recipe level summaries
+
+#### 2.4 Unified Metadata
+
+All chunks now share one unified metadata structure:
+[RecipeChunkMetadata.java](/Users/zefengqiu/Documents/xiachufang/src/main/java/com/webcrawler/recipe/app/model/recipe/RecipeChunkMetadata.java:1)
+
+Core fields:
+
+- `chunkId`
+- `parentChunkId`
+- `dishId`
+- `dishName`
+- `view`
+- `chunkOrder`
+- `category`
+- `difficulty`
+- `tags`
+- `servings`
+- `prepTimeMinutes`
+- `cookTimeMinutes`
+- `totalTimeMinutes`
+- `stepStart`
+- `stepEnd`
+- `stepRange`
+
+This gives the system:
+
+- a consistent structure for BM25 / vector / rerank
+- consistent logging and candidate merging
+- easier future extension of chunk types
+
+---
+
+### 3. Tech Stack
+
+#### Backend
 
 - Java `17`
 - Maven
@@ -48,16 +138,18 @@
 - `langchain4j-open-ai`
 - `langchain4j-cohere`
 - Jsoup
-- 本地 embedding 模型：`AllMiniLmL6V2EmbeddingModel`
+- Local embedding model: `AllMiniLmL6V2EmbeddingModel`
 
-### 前端
+#### Frontend
 
 - Node.js `18+`
 - React `18`
 - TypeScript
 - Vite `5`
 
-## 3. 目录结构
+---
+
+### 4. Project Layout
 
 ```text
 .
@@ -65,25 +157,321 @@
 ├── caipu.txt
 ├── pom.xml
 ├── src/main/java/com/webcrawler/recipe/app
-│   ├── RecipeApplication.java
-│   ├── config/                      # 模型、检索、Rerank Bean 配置
-│   ├── controller/                  # /api HTTP 接口
-│   ├── model/                       # 请求、响应、菜谱、搜索模型
-│   ├── retriever/                   # BM25 / Vector / Hybrid / Rerank
-│   ├── service/                     # 本地问答、流式问答、联网 fallback
-│   ├── tool/                        # LangChain4j tools
-│   └── util/                        # 规范化、chunking、prompt builder
+│   ├── config/
+│   ├── controller/
+│   ├── model/
+│   ├── retriever/
+│   ├── service/
+│   ├── tool/
+│   └── util/
 ├── src/main/resources
 │   └── application.properties
 └── chat-ui
-    ├── package.json
-    ├── vite.config.ts
-    └── src/
 ```
 
-## 4. 当前架构
+---
 
-### 4.1 检索与回答流程
+### 5. Local Development
+
+Requirements:
+
+- JDK `17`
+- Maven `3.9+`
+- Node.js `18+`
+- npm `9+`
+
+Check:
+
+```bash
+java -version
+mvn -version
+node -v
+npm -v
+```
+
+#### 5.1 Start the Backend
+
+```bash
+mvn spring-boot:run
+```
+
+Default backend URL:
+
+```text
+http://localhost:8091
+```
+
+Health check:
+
+```bash
+curl http://localhost:8091/api/health
+```
+
+#### 5.2 Start the Frontend
+
+```bash
+cd chat-ui
+npm install
+npm run dev
+```
+
+Default frontend URL:
+
+```text
+http://localhost:5173
+```
+
+---
+
+### 6. Configuration
+
+The config file is:
+[src/main/resources/application.properties](/Users/zefengqiu/Documents/xiachufang/src/main/resources/application.properties:1)
+
+#### 6.1 Important Settings
+
+| Key | Purpose | Default |
+| --- | --- | --- |
+| `server.port` | backend port | `8091` |
+| `recipe.data.path` | recipe data path | `caipu.txt` |
+| `recipe.web.enabled` | enable web fallback | `true` |
+| `recipe.web.timeout-ms` | web request timeout | `8000` |
+| `recipe.web.max-results` | max search results | `5` |
+| `recipe.debug.rag` | enable debug logging | `true` |
+| `recipe.rerank.enabled` | enable Cohere rerank | `false` |
+| `recipe.rerank.top-n` | max rerank candidates | `10` |
+| `recipe.rerank.cohere.base-url` | Cohere API base URL | `https://api.cohere.com` |
+| `recipe.rerank.cohere.model` | Cohere rerank model | `rerank-multilingual-v3.0` |
+| `recipe.rerank.cohere.timeout` | rerank timeout | `PT20S` |
+| `recipe.rerank.cohere.max-retries` | rerank retries | `2` |
+| `recipe.rerank.cohere.api-key` | Cohere API key | empty |
+| `langchain4j.open-ai.base-url` | OpenAI-compatible base URL | `https://api.deepseek.com` |
+| `langchain4j.open-ai.model` | chat model | `deepseek-chat` |
+| `langchain4j.open-ai.api-key` | chat model API key | empty |
+
+#### 6.2 Recommended Environment Variables
+
+```bash
+export DEEPSEEK_API_KEY=your-key
+export COHERE_API_KEY=your-key
+```
+
+Recommended property usage:
+
+```properties
+langchain4j.open-ai.api-key=${DEEPSEEK_API_KEY:}
+recipe.rerank.cohere.api-key=${COHERE_API_KEY:}
+```
+
+#### 6.3 Enable Cohere Rerank
+
+```properties
+recipe.rerank.enabled=true
+recipe.rerank.cohere.api-key=${COHERE_API_KEY:}
+recipe.rerank.cohere.model=rerank-multilingual-v3.0
+```
+
+---
+
+### 7. API Endpoints
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/api/chat/stream` | streaming chat, prefers the AI tools path |
+| `POST` | `/api/recipes/ask` | local recipe QA / web fallback QA |
+| `GET` | `/api/recipes` | recipe list, supports `q` and `limit` |
+| `GET` | `/api/recipes/{id}` | recipe detail |
+| `GET` | `/api/health` | health check |
+
+Example local QA request:
+
+```bash
+curl -X POST http://localhost:8091/api/recipes/ask \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "sessionId": null,
+    "query": "How should I marinate the meat for fish-fragrant shredded pork?"
+  }'
+```
+
+---
+
+### 8. Debug Logging
+
+With `recipe.debug.rag=true`, the system emits these logs.
+
+#### 8.1 Local Retrieval
+
+- `RAG-QUERY`
+- `RAG-DIRECT`
+- `RAG-RETRIEVE`
+- `RAG-SELECT`
+- `RAG-PROMPT`
+
+#### 8.2 RRF
+
+- `RRF-BM25`
+- `RRF-VECTOR`
+- `RRF-FUSED`
+
+To validate the new chunking strategy, check whether:
+
+- full-recipe queries surface `summary / recipe_parent_light`
+- ingredient queries surface `ingredients_full / ingredients_terms`
+- step-level queries surface `steps_window`
+- technique queries surface `notes_technique`
+
+#### 8.3 Cohere Rerank
+
+- `RERANK-SKIP`
+- `RERANK-SCORE`
+- `RERANK-ORDER`
+
+The simplest way to see rerank contribution is to compare:
+
+1. `RRF-FUSED`
+2. `RERANK-ORDER`
+
+---
+
+### 9. Build and Deploy
+
+#### 9.1 Backend
+
+```bash
+mvn clean package
+java -jar target/recipe-agent-0.0.1-SNAPSHOT.jar
+```
+
+#### 9.2 Frontend
+
+```bash
+cd chat-ui
+npm install
+npm run build
+```
+
+#### 9.3 Minimal Deployment Example
+
+```bash
+export DEEPSEEK_API_KEY=your-key
+export COHERE_API_KEY=your-key
+
+java -jar target/recipe-agent-0.0.1-SNAPSHOT.jar \
+  --recipe.data.path=/absolute/path/to/caipu.txt \
+  --recipe.rerank.enabled=true
+```
+
+Use Nginx to serve `chat-ui/dist` and proxy `/api` to port `8091`.
+Disable proxy buffering for streaming endpoints.
+
+---
+
+### 10. Common Issues
+
+#### 10.1 `caipu.txt` Not Found
+
+Start the app from the repo root, or pass:
+
+```bash
+--recipe.data.path=/absolute/path/to/caipu.txt
+```
+
+#### 10.2 `CohereScoringModel` Import Fails
+
+Make sure the dependency exists:
+
+```xml
+<dependency>
+    <groupId>dev.langchain4j</groupId>
+    <artifactId>langchain4j-cohere</artifactId>
+    <version>${langchain4j.version}</version>
+</dependency>
+```
+
+Then run:
+
+```bash
+mvn -q -DskipTests compile
+```
+
+#### 10.3 `RRF-FUSED` Does Not Appear
+
+If the query is resolved by `directNameHit`, hybrid retrieval is skipped.
+
+#### 10.4 `RERANK-SCORE` Does Not Appear
+
+Check:
+
+```properties
+recipe.rerank.enabled=true
+recipe.rerank.cohere.api-key=${COHERE_API_KEY:}
+recipe.debug.rag=true
+```
+
+If rerank is skipped, inspect:
+
+- `RERANK-SKIP reason=disabled`
+- `RERANK-SKIP reason=no_scoring_model`
+- `RERANK-SKIP reason=empty_candidates`
+
+---
+
+### 11. Next Steps
+
+1. Remove all plaintext API keys from the repo
+2. Add systematic evaluation sets for `chunk -> RRF -> rerank`
+3. Run A/B tests for the `CRISPE` prompts
+4. Make `steps_window` size and overlap configurable
+5. Add backend tests
+6. Add `Dockerfile + docker-compose`
+
+---
+
+### 12. Quick Start
+
+```bash
+# Terminal 1: backend
+cd /path/to/xiachufang
+mvn spring-boot:run
+
+# Terminal 2: frontend
+cd /path/to/xiachufang/chat-ui
+npm install
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:5173
+```
+
+---
+
+## 中文
+
+### 1. 项目简介
+
+这是一个面向中文菜谱问答场景的示例项目。
+
+- 后端：`Spring Boot 3 + LangChain4j`
+- 前端：`React + Vite`
+- 数据源：根目录 `caipu.txt`
+- 检索链路：`BM25 + Vector -> RRF -> Cohere Rerank`
+- 兜底链路：本地命中不足时，联网搜索并抽取网页内容
+
+当前系统支持三条主要路径：
+
+1. 本地 RAG 问答
+2. 联网 Web fallback 问答
+3. 基于 LangChain4j `AiServices` 的流式工具调用聊天
+
+---
+
+### 2. 当前架构
+
+#### 2.1 检索与回答流程
 
 ```mermaid
 flowchart TD
@@ -95,7 +483,7 @@ flowchart TD
     E --> G[RRF 融合]
     F --> G
     G --> H{启用 Cohere Rerank?}
-    H -->|是| I[CohereScoringModel 二次排序]
+    H -->|是| I[Cohere 二次排序]
     H -->|否| J[直接使用 RRF 顺序]
     I --> K[生成本地答案]
     J --> K
@@ -106,23 +494,128 @@ flowchart TD
     D --> M
 ```
 
-### 4.2 Prompt 组织
+#### 2.2 Prompt 策略
 
-项目里的回答 prompt 已改成压缩版 `CRISPE` 结构：
+当前回答 prompt 使用压缩版 `CRISPE` 结构：
 
-- `RecipePromptBuilder`: 本地 RAG 问答
-- `WebRecipePromptBuilder`: 联网 fallback 问答
+- `RecipePromptBuilder`：本地 RAG 问答
+- `WebRecipePromptBuilder`：联网 fallback 问答
 
-目标是让模型更稳定地：
+目标：
 
-- 先回答结论
+- 先给结论，再补充必要说明
 - 尽量只基于当前上下文
 - 信息不足时明确说明
-- 少说套话，少编造成分
+- 减少套话和无依据扩写
 
-## 5. 开发前准备
+#### 2.3 Chunk 策略
 
-请确认本机安装：
+当前 chunking 已从“把步骤拆碎后再拼接”改成结构感知的多视图 chunk。
+
+每道菜当前会生成这些 chunk：
+
+- `summary`
+- `ingredients_full`
+- `ingredients_terms`
+- `steps_window`
+- `notes_technique`
+- `recipe_parent_light`
+
+设计要点：
+
+- `summary`：整道菜的简介、分类、难度、份量、时长、标签
+- `ingredients_full`：保留原始食材表达
+- `ingredients_terms`：归一化食材词项，主要服务 BM25
+- `steps_window`：按原始步骤切窗，默认 `3` 步一块，`overlap 1` 步
+- `notes_technique`：从 `additionalNotes` 和步骤里的注意事项提取技巧块
+- `recipe_parent_light`：整道菜级别的轻量父块
+
+这套设计是为了同时兼顾：
+
+- 整道菜 query
+- 食材 query
+- 单步 / 顺序 / 火候 query
+- 技巧 / 失败原因 query
+
+#### 2.4 统一 Metadata
+
+所有 chunk 共用统一 metadata 结构：
+[RecipeChunkMetadata.java](/Users/zefengqiu/Documents/xiachufang/src/main/java/com/webcrawler/recipe/app/model/recipe/RecipeChunkMetadata.java:1)
+
+核心字段：
+
+- `chunkId`
+- `parentChunkId`
+- `dishId`
+- `dishName`
+- `view`
+- `chunkOrder`
+- `category`
+- `difficulty`
+- `tags`
+- `servings`
+- `prepTimeMinutes`
+- `cookTimeMinutes`
+- `totalTimeMinutes`
+- `stepStart`
+- `stepEnd`
+- `stepRange`
+
+目的：
+
+- 统一 BM25 / vector / rerank 输入结构
+- 统一日志和候选归并
+- 便于后续继续扩展 chunk 类型
+
+---
+
+### 3. 技术栈
+
+#### 后端
+
+- Java `17`
+- Maven
+- Spring Boot `3.3.5`
+- LangChain4j `0.36.2`
+- `langchain4j-open-ai`
+- `langchain4j-cohere`
+- Jsoup
+- 本地 embedding 模型：`AllMiniLmL6V2EmbeddingModel`
+
+#### 前端
+
+- Node.js `18+`
+- React `18`
+- TypeScript
+- Vite `5`
+
+---
+
+### 4. 目录结构
+
+```text
+.
+├── README.md
+├── caipu.txt
+├── pom.xml
+├── src/main/java/com/webcrawler/recipe/app
+│   ├── config/      # 模型、检索、Rerank 配置
+│   ├── controller/  # /api HTTP 接口
+│   ├── model/       # 请求、响应、菜谱、metadata
+│   ├── retriever/   # BM25 / Vector / Hybrid / Rerank
+│   ├── service/     # 本地问答、流式问答、联网 fallback
+│   ├── tool/        # LangChain4j tools
+│   └── util/        # 规范化、chunking、prompt builder
+├── src/main/resources
+│   └── application.properties
+└── chat-ui
+```
+
+---
+
+### 5. 本地开发
+
+环境要求：
 
 - JDK `17`
 - Maven `3.9+`
@@ -138,70 +631,7 @@ node -v
 npm -v
 ```
 
-## 6. 配置说明
-
-配置文件在 [src/main/resources/application.properties](/Users/zefengqiu/Documents/xiachufang/src/main/resources/application.properties:1)。
-
-### 6.1 关键配置
-
-| 配置项 | 作用 | 默认值 |
-| --- | --- | --- |
-| `server.port` | 后端端口 | `8091` |
-| `recipe.data.path` | 菜谱数据路径 | `caipu.txt` |
-| `recipe.web.enabled` | 是否允许联网 fallback | `true` |
-| `recipe.web.timeout-ms` | 联网请求超时 | `8000` |
-| `recipe.web.max-results` | 搜索结果上限 | `5` |
-| `recipe.debug.rag` | 是否打印检索 / prompt / rerank 调试日志 | `true` |
-| `recipe.rerank.enabled` | 是否启用 Cohere rerank | `false` |
-| `recipe.rerank.top-n` | rerank 候选上限 | `10` |
-| `recipe.rerank.cohere.base-url` | Cohere API 地址 | `https://api.cohere.com` |
-| `recipe.rerank.cohere.model` | Cohere rerank 模型 | `rerank-multilingual-v3.0` |
-| `recipe.rerank.cohere.timeout` | rerank 超时 | `PT20S` |
-| `recipe.rerank.cohere.max-retries` | rerank 重试次数 | `2` |
-| `recipe.rerank.cohere.api-key` | Cohere API Key | 空 |
-| `langchain4j.open-ai.base-url` | OpenAI 兼容接口地址 | `https://api.deepseek.com` |
-| `langchain4j.open-ai.model` | 对话模型名 | `deepseek-chat` |
-| `langchain4j.open-ai.api-key` | 对话模型 API Key | 空 |
-
-### 6.2 API Key 配置
-
-推荐改成环境变量，不要把 Key 写进仓库。
-
-macOS / Linux:
-
-```bash
-export DEEPSEEK_API_KEY=你的密钥
-export COHERE_API_KEY=你的密钥
-```
-
-然后在 `application.properties` 里引用，或通过启动参数传入。
-
-至少建议这样改：
-
-```properties
-langchain4j.open-ai.api-key=${DEEPSEEK_API_KEY:}
-recipe.rerank.cohere.api-key=${COHERE_API_KEY:}
-```
-
-### 6.3 启用 Cohere rerank
-
-只加依赖还不够，还需要显式打开：
-
-```properties
-recipe.rerank.enabled=true
-recipe.rerank.cohere.api-key=${COHERE_API_KEY:}
-recipe.rerank.cohere.model=rerank-multilingual-v3.0
-```
-
-当前代码里使用的是 `langchain4j-cohere` 的 `CohereScoringModel`。
-
-## 7. 本地开发启动
-
-推荐两个终端：一个后端，一个前端。
-
-### 7.1 启动后端
-
-仓库根目录执行：
+#### 5.1 启动后端
 
 ```bash
 mvn spring-boot:run
@@ -219,13 +649,7 @@ http://localhost:8091
 curl http://localhost:8091/api/health
 ```
 
-预期返回：
-
-```json
-{"status":"ok"}
-```
-
-### 7.2 启动前端
+#### 5.2 启动前端
 
 ```bash
 cd chat-ui
@@ -239,9 +663,59 @@ npm run dev
 http://localhost:5173
 ```
 
-`Vite` 已代理 `/api` 到 `8091`，本地联调不需要改接口地址。
+---
 
-## 8. 常用接口
+### 6. 配置说明
+
+配置文件在
+[src/main/resources/application.properties](/Users/zefengqiu/Documents/xiachufang/src/main/resources/application.properties:1)。
+
+#### 6.1 关键配置
+
+| 配置项 | 作用 | 默认值 |
+| --- | --- | --- |
+| `server.port` | 后端端口 | `8091` |
+| `recipe.data.path` | 菜谱数据路径 | `caipu.txt` |
+| `recipe.web.enabled` | 是否允许联网 fallback | `true` |
+| `recipe.web.timeout-ms` | 联网请求超时 | `8000` |
+| `recipe.web.max-results` | 搜索结果上限 | `5` |
+| `recipe.debug.rag` | 是否打印调试日志 | `true` |
+| `recipe.rerank.enabled` | 是否启用 Cohere rerank | `false` |
+| `recipe.rerank.top-n` | rerank 候选上限 | `10` |
+| `recipe.rerank.cohere.base-url` | Cohere API 地址 | `https://api.cohere.com` |
+| `recipe.rerank.cohere.model` | Cohere 模型 | `rerank-multilingual-v3.0` |
+| `recipe.rerank.cohere.timeout` | rerank 超时 | `PT20S` |
+| `recipe.rerank.cohere.max-retries` | rerank 重试 | `2` |
+| `recipe.rerank.cohere.api-key` | Cohere API Key | 空 |
+| `langchain4j.open-ai.base-url` | OpenAI 兼容地址 | `https://api.deepseek.com` |
+| `langchain4j.open-ai.model` | 对话模型 | `deepseek-chat` |
+| `langchain4j.open-ai.api-key` | 对话模型 API Key | 空 |
+
+#### 6.2 推荐的环境变量
+
+```bash
+export DEEPSEEK_API_KEY=你的密钥
+export COHERE_API_KEY=你的密钥
+```
+
+推荐在配置里这样引用：
+
+```properties
+langchain4j.open-ai.api-key=${DEEPSEEK_API_KEY:}
+recipe.rerank.cohere.api-key=${COHERE_API_KEY:}
+```
+
+#### 6.3 启用 Cohere rerank
+
+```properties
+recipe.rerank.enabled=true
+recipe.rerank.cohere.api-key=${COHERE_API_KEY:}
+recipe.rerank.cohere.model=rerank-multilingual-v3.0
+```
+
+---
+
+### 7. 常用接口
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -251,7 +725,7 @@ http://localhost:5173
 | `GET` | `/api/recipes/{id}` | 单个菜谱详情 |
 | `GET` | `/api/health` | 健康检查 |
 
-### 8.1 测试本地问答
+测试本地问答：
 
 ```bash
 curl -X POST http://localhost:8091/api/recipes/ask \
@@ -262,69 +736,56 @@ curl -X POST http://localhost:8091/api/recipes/ask \
   }'
 ```
 
-### 8.2 测试流式聊天
+---
 
-```bash
-curl -N -X POST http://localhost:8091/api/chat/stream \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "sessionId": null,
-    "message": "宫保鸡丁怎么做？"
-  }'
-```
+### 8. 调试日志
 
-## 9. 调试与日志
+当 `recipe.debug.rag=true` 时，当前会打印这些关键日志。
 
-当 `recipe.debug.rag=true` 时，当前会打印这些关键日志：
+#### 8.1 本地检索
 
-### 9.1 本地检索
+- `RAG-QUERY`
+- `RAG-DIRECT`
+- `RAG-RETRIEVE`
+- `RAG-SELECT`
+- `RAG-PROMPT`
 
-- `RAG-QUERY`: 原始 query 与标准化 query
-- `RAG-DIRECT`: 是否命中直接菜名
-- `RAG-RETRIEVE`: 进入 content retriever 后的候选
-- `RAG-SELECT`: 最终选中的本地菜谱
-- `RAG-PROMPT`: 本地 RAG prompt
+#### 8.2 RRF
 
-### 9.2 RRF 融合
+- `RRF-BM25`
+- `RRF-VECTOR`
+- `RRF-FUSED`
 
-- `RRF-BM25`: BM25 原始排名
-- `RRF-VECTOR`: Vector 原始排名
-- `RRF-FUSED`: RRF 融合后的候选顺序
+验证新 chunk 是否有效时，重点看：
 
-### 9.3 Cohere rerank
+- 整道菜 query 是否更容易命中 `summary / recipe_parent_light`
+- 食材 query 是否更容易命中 `ingredients_full / ingredients_terms`
+- 步骤 query 是否更容易命中 `steps_window`
+- 技巧 query 是否更容易命中 `notes_technique`
 
-- `RERANK-SKIP`: 未执行 rerank 的原因，例如 `disabled`、`no_scoring_model`
-- `RERANK-SCORE`: rerank 给每个候选打的分
-- `RERANK-ORDER`: rerank 前后顺序变化
+#### 8.3 Cohere Rerank
 
-如果你想确认 rerank 是否真的有贡献，最直接的办法就是对照：
+- `RERANK-SKIP`
+- `RERANK-SCORE`
+- `RERANK-ORDER`
 
-1. `RRF-FUSED` 的前几名
-2. `RERANK-ORDER` 的前几名
+判断 rerank 是否有效，最直接的方法是对照：
 
-看正确候选是否被 rerank 从后面提上来。
+1. `RRF-FUSED`
+2. `RERANK-ORDER`
 
-## 10. 构建
+---
 
-### 10.1 后端
+### 9. 构建与部署
+
+#### 9.1 后端构建
 
 ```bash
 mvn clean package
-```
-
-产物通常在：
-
-```text
-target/recipe-agent-0.0.1-SNAPSHOT.jar
-```
-
-运行：
-
-```bash
 java -jar target/recipe-agent-0.0.1-SNAPSHOT.jar
 ```
 
-### 10.2 前端
+#### 9.2 前端构建
 
 ```bash
 cd chat-ui
@@ -332,88 +793,35 @@ npm install
 npm run build
 ```
 
-产物目录：
-
-```text
-chat-ui/dist/
-```
-
-## 11. 部署说明
-
-当前更适合这种部署方式：
-
-- Spring Boot 独立跑后端
-- Nginx 托管 `chat-ui/dist`
-- Nginx 把 `/api` 代理到 Spring Boot
-
-### 11.1 最小可用部署步骤
-
-1. 构建前后端
+#### 9.3 最小部署示例
 
 ```bash
-mvn clean package
-cd chat-ui
-npm install
-npm run build
-```
-
-2. 启动后端
-
-```bash
-export DEEPSEEK_API_KEY=你的密钥
-export COHERE_API_KEY=你的密钥
+export DEEPSEEK_API_KEY=your-key
+export COHERE_API_KEY=your-key
 
 java -jar target/recipe-agent-0.0.1-SNAPSHOT.jar \
   --recipe.data.path=/absolute/path/to/caipu.txt \
   --recipe.rerank.enabled=true
 ```
 
-3. 配置 Nginx
+使用 Nginx 托管 `chat-ui/dist` 并把 `/api` 代理到 `8091`。
+对流式接口关闭代理缓冲。
 
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
+---
 
-    root /path/to/xiachufang/chat-ui/dist;
-    index index.html;
+### 10. 常见问题
 
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
+#### 10.1 找不到 `caipu.txt`
 
-    location /api/ {
-        proxy_pass http://127.0.0.1:8091;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_buffering off;
-    }
-}
-```
-
-`proxy_buffering off;` 对 `application/x-ndjson` 流式接口更友好。
-
-## 12. 常见问题
-
-### 12.1 启动失败：找不到 `caipu.txt`
-
-原因通常是 `recipe.data.path=caipu.txt` 是相对路径。
-
-处理方式：
-
-- 在仓库根目录启动
-- 或显式传入绝对路径：
+请在仓库根目录启动，或显式指定：
 
 ```bash
 --recipe.data.path=/absolute/path/to/caipu.txt
 ```
 
-### 12.2 `CohereScoringModel` import 失败
+#### 10.2 `CohereScoringModel` import 失败
 
-先确认：
+确认依赖已加：
 
 ```xml
 <dependency>
@@ -429,19 +837,11 @@ server {
 mvn -q -DskipTests compile
 ```
 
-如果终端能编过但 IDE 仍报红，通常是 Maven 没刷新，重新 `Reload/Reimport` 即可。
+#### 10.3 看不到 `RRF-FUSED`
 
-### 12.3 为什么看不到 `RRF-FUSED`
+如果 query 被 `directNameHit` 命中，就不会进入混合检索。
 
-如果 query 先命中了 `directNameHit`，请求不会进入混合检索，自然也不会有 `RRF-FUSED`。
-
-更适合观察 RRF 的 query 一般是：
-
-- `适合新手的鱼香肉丝做法`
-- `少油版宫保鸡丁`
-- `鱼香肉丝里的肉怎么腌`
-
-### 12.4 为什么看不到 `RERANK-SCORE`
+#### 10.4 看不到 `RERANK-SCORE`
 
 优先检查：
 
@@ -451,39 +851,26 @@ recipe.rerank.cohere.api-key=${COHERE_API_KEY:}
 recipe.debug.rag=true
 ```
 
-如果 rerank 没执行，日志里会先看到：
+如果 rerank 没执行，先看：
 
 - `RERANK-SKIP reason=disabled`
 - `RERANK-SKIP reason=no_scoring_model`
 - `RERANK-SKIP reason=empty_candidates`
 
-### 12.5 前端打开了，但请求失败
+---
 
-优先检查：
-
-1. 后端是否启动在 `8091`
-2. 前端是否通过 `npm run dev` 启动
-3. 浏览器请求是否发到了 `/api/...`
-
-### 12.6 生产环境流式接口不流式
-
-通常是反向代理缓冲导致：
-
-- 检查是否代理到了 `/api/chat/stream`
-- 检查 `proxy_buffering off;`
-- 检查是否有额外网关或 CDN 聚合响应
-
-## 13. 后续建议
-
-如果继续迭代，优先建议做这些事：
+### 11. 后续建议
 
 1. 把明文 API Key 全部移出仓库
-2. 给 `RRF + rerank` 增加更系统的评测样本
-3. 给 `CRISPE` prompt 加 A/B 对比测试
-4. 增加后端单元测试和接口测试
-5. 补一套 `Dockerfile + docker-compose`
+2. 给 `chunk -> RRF -> rerank` 增加系统化评测样本
+3. 给 `CRISPE` prompt 做 A/B 对比
+4. 把 `steps_window` 的窗口大小和 overlap 做成配置项
+5. 增加后端测试
+6. 补 `Dockerfile + docker-compose`
 
-## 14. 一句话启动
+---
+
+### 12. 一句话启动
 
 ```bash
 # 终端 1：后端

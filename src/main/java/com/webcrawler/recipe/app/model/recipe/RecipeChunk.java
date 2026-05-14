@@ -5,20 +5,18 @@ import java.util.List;
 public class RecipeChunk {
 
     private String text;
-    private String dishId;
-    private String dishName;
-    private String view;
-    private String category;
-    private Integer difficulty;
-    private List<String> tags;
-    private String stepRange;
+    private RecipeChunkMetadata metadata;
 
     public RecipeChunk() {
+        this.metadata = new RecipeChunkMetadata();
     }
 
     public RecipeChunk(String id, String dishId, String type, int order, String text) {
-        this.dishId = dishId;
-        this.view = type;
+        this();
+        this.metadata.setChunkId(id);
+        this.metadata.setDishId(dishId);
+        this.metadata.setView(type);
+        this.metadata.setChunkOrder(order);
         this.text = text;
     }
 
@@ -27,7 +25,7 @@ public class RecipeChunk {
     }
 
     public String type() {
-        return view;
+        return getView();
     }
 
     public String getText() {
@@ -39,58 +37,73 @@ public class RecipeChunk {
     }
 
     public String getDishId() {
-        return dishId;
+        return metadata == null ? null : metadata.getDishId();
     }
 
     public void setDishId(String dishId) {
-        this.dishId = dishId;
+        ensureMetadata().setDishId(dishId);
     }
 
     public String getDishName() {
-        return dishName;
+        return metadata == null ? null : metadata.getDishName();
     }
 
     public void setDishName(String dishName) {
-        this.dishName = dishName;
+        ensureMetadata().setDishName(dishName);
     }
 
     public String getView() {
-        return view;
+        return metadata == null ? null : metadata.getView();
     }
 
     public void setView(String view) {
-        this.view = view;
+        ensureMetadata().setView(view);
     }
 
     public String getCategory() {
-        return category;
+        return metadata == null ? null : metadata.getCategory();
     }
 
     public void setCategory(String category) {
-        this.category = category;
+        ensureMetadata().setCategory(category);
     }
 
     public Integer getDifficulty() {
-        return difficulty;
+        return metadata == null ? null : metadata.getDifficulty();
     }
 
     public void setDifficulty(Integer difficulty) {
-        this.difficulty = difficulty;
+        ensureMetadata().setDifficulty(difficulty);
     }
 
     public List<String> getTags() {
-        return tags;
+        return metadata == null ? null : metadata.getTags();
     }
 
     public void setTags(List<String> tags) {
-        this.tags = tags;
+        ensureMetadata().setTags(tags);
     }
 
     public String getStepRange() {
-        return stepRange;
+        return metadata == null ? null : metadata.getStepRange();
     }
 
     public void setStepRange(String stepRange) {
-        this.stepRange = stepRange;
+        ensureMetadata().setStepRange(stepRange);
+    }
+
+    public RecipeChunkMetadata getMetadata() {
+        return ensureMetadata();
+    }
+
+    public void setMetadata(RecipeChunkMetadata metadata) {
+        this.metadata = metadata == null ? new RecipeChunkMetadata() : metadata;
+    }
+
+    private RecipeChunkMetadata ensureMetadata() {
+        if (metadata == null) {
+            metadata = new RecipeChunkMetadata();
+        }
+        return metadata;
     }
 }
